@@ -22,7 +22,7 @@ class XlsxWriter
     attr_reader :row_count
     attr_reader :max_row_length
     attr_reader :max_cell_pixel_width
-    attr_reader :validation
+    attr_reader :validations
 
     # Freeze the pane under this top left cell
     attr_accessor :freeze_top_left
@@ -39,7 +39,7 @@ class XlsxWriter
       @path = ::File.join document.staging_dir, relative_path
       ::FileUtils.mkdir_p ::File.dirname(path)
       @rows_tmp_file_writer = ::File.open(rows_tmp_file_path, 'wb')
-      @validation = nil
+      @validations = nil
     end
 
     def generated?
@@ -80,10 +80,14 @@ EOS
           end
           f.write %{</sheetData>}
 
-          if validation
-            f.write <<-EOS
-<dataValidations count="1"><dataValidation type="list" operator="equal" allowBlank="1" showErrorMessage="1" sqref="#{validation[:sqref]}"><formula1>"#{validation[:list]}"</formula1></dataValidation></dataValidations>
+          if validations
+            f.write %Q(<dataValidations count="#{validations.count}">)
+            validations.each do |valid|
+              f.write <<-EOS
+<dataValidation type="list" operator="equal" allowBlank="1" showErrorMessage="1" sqref="#{valid[:sqref]}"><formula1>"#{valid[:list]}"</formula1></dataValidation>
 EOS
+            end
+            f.write %Q(</dataValidations>)
           end
           autofilters.each { |autofilter| f.write autofilter.to_xml }
           f.write document.page_setup.to_xml
@@ -140,10 +144,11 @@ EOS
       nil
     end
 
-    def add_validation(sqref, list)
-      @validation = {}
-      @validation[:sqref] = sqref
-      @validation[:list] = list
+    def add_validations(valids)
+      @validations = []
+      valids.each do |v|
+        @validations << { :sqref => v[0], :list => v[1] }
+      end
     end
 
     private
